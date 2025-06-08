@@ -10,6 +10,8 @@
 // 
 //cleanup
 
+struct GLFWwindow;
+
 struct QueueFamilyIndices {
 	std::optional<uint32_t> graphicsFamily;
 	std::optional<uint32_t> presentFamily;
@@ -31,6 +33,7 @@ public:
 	VulkanRenderer();
 	~VulkanRenderer();
 
+	//---------------------------loop-------------------------------------------
 	void Startup();
 	void BeginFrame();
 	void EndFrame();
@@ -89,9 +92,34 @@ private:
 
 	//-------------------Help Functions-----------------------------------------
 	
-
 public:
 protected:
 private:
-	
+	GLFWwindow* m_window;
+	VkInstance m_instance;
+	VkDebugUtilsMessengerEXT m_debugMessenger;
+	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+	VkDevice m_device;
+	VkPhysicalDeviceFeatures m_deviceFeatures{};
+	VkQueue m_graphicsQueue;
+	VkSurfaceKHR m_surface;
+	VkQueue m_presentQueue;
+	VkSwapchainKHR m_swapChain;
+	std::vector<VkImage> m_swapChainImages;
+	VkFormat m_swapChainImageFormat;
+	VkExtent2D m_swapChainExtent;
+	std::vector<VkImageView> m_swapChainImageViews;
+	VkRenderPass m_renderPass;
+	VkPipelineLayout m_pipelineLayout;
+	VkPipeline m_graphicsPipeline;
+	std::vector<VkFramebuffer> m_swapChainFramebuffers;
+	VkCommandPool m_commandPool;
+	std::vector<VkCommandBuffer> m_commandBuffers;
+	VkSemaphore m_imageAvailableSemaphore;
+	VkSemaphore m_renderFinishedSemaphore;
+	VkFence m_inFlightFence;
+	std::vector<VkSemaphore> m_imageAvailableSemaphores;
+	std::vector<VkSemaphore> m_renderFinishedSemaphores;
+	std::vector<VkFence> m_inFlightFences;
+	uint32_t m_currentFrame = 0;
 };
