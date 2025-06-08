@@ -85,13 +85,16 @@ private:
 	// Command
 	void CreateCommandPool();
 
+	void CreateVertexBuffer();
+
 	void CreateCommandBuffer();
 
 	//Sync
 	void CreateSyncObjects();
 
 	//-------------------Help Functions-----------------------------------------
-	
+	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
 public:
 protected:
 private:
