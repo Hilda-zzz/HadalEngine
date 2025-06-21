@@ -187,14 +187,14 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="Run\Data\Shaders\shader.frag" />
-    <None Include="Run\Data\Shaders\shader.vert" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VulkanRenderer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Run\Data\Shaders\shader.frag" />
+    <None Include="..\Run\Data\Shaders\shader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
