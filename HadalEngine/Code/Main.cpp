@@ -277,6 +277,9 @@ private:
 	void cleanup() {
 		cleanupSwapChain();
 
+		vkDestroyImage(device, textureImage, nullptr);
+		vkFreeMemory(device, textureImageMemory, nullptr);
+		
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			vkDestroyBuffer(device, uniformBuffers[i], nullptr);
 			vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
@@ -786,7 +789,7 @@ private:
 
 	void createTextureImage() {
 		int texWidth, texHeight, texChannels;
-		stbi_uc* pixels = stbi_load("textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		stbi_uc* pixels = stbi_load("Data/Textures/Test_StbiFlippedAndOpenGL.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 		VkDeviceSize imageSize = texWidth * texHeight * 4;
 
 		if (!pixels) {
@@ -803,8 +806,15 @@ private:
 		vkUnmapMemory(device, stagingBufferMemory);
 
 		stbi_image_free(pixels);
+		
+		createImage(texWidth, texHeight,
+			VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
-		createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+		transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+		transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
@@ -1352,12 +1362,95 @@ private:
 
 		vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 	}
-	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+	
+	void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
-		endSingleTimeCommands(commandBuffer);
-	}
+    // 创建图像内存屏障
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = nullptr;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
 
+    // 根据布局转换设置同步参数
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        // 在 C 中可以用 printf 或其他错误处理方式
+        printf("Error: unsupported layout transition!\n");
+        return;
+        // 或者如果你的项目支持异常：
+        // throw std::invalid_argument("unsupported layout transition!");
+    }
+
+    // 提交管线屏障
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage,         // srcStageMask
+        destinationStage,    // dstStageMask
+        0,                   // dependencyFlags
+        0, nullptr,          // memoryBarrierCount, pMemoryBarriers
+        0, nullptr,          // bufferMemoryBarrierCount, pBufferMemoryBarriers
+        1, &barrier          // imageMemoryBarrierCount, pImageMemoryBarriers
+    );
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+	
+void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+	VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+	// 创建缓冲区图像复制区域
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;                    // 缓冲区中数据的字节偏移量
+	region.bufferRowLength = 0;                 // 0 表示像素紧密排列
+	region.bufferImageHeight = 0;               // 0 表示像素紧密排列
+
+	// 指定图像的哪一部分要复制
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+
+	// 指定图像中要复制到的区域
+	region.imageOffset = {0, 0, 0};             // 从图像的 (0,0,0) 开始
+	region.imageExtent = {width, height, 1};    // 复制区域的尺寸
+
+	// 执行复制命令
+	vkCmdCopyBufferToImage(
+		commandBuffer,
+		buffer,
+		image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // 图像当前必须是传输目标布局
+		1,                                      // 复制区域数量
+		&region                                 // 复制区域数组
+	);
+
+	endSingleTimeCommands(commandBuffer);
+}
 
 private:
 	GLFWwindow* window;
@@ -1408,6 +1501,7 @@ private:
 
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
+	
 };
 
 int main() {
