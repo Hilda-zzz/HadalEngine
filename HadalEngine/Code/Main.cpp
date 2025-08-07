@@ -369,19 +369,11 @@ private:
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
-		//get required extensions
+		//----------------------get required extensions-----------------------------
 		auto extensions = getRequiredExtensions();
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		createInfo.ppEnabledExtensionNames = extensions.data();
-
-		//set up validation layers
-		if (enableValidationLayers) {
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-		}
-		else {
-			createInfo.enabledLayerCount = 0;
-		}
+		
 		//---------------------debug info--------------------------------------------
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 		if (enableValidationLayers) {
@@ -393,9 +385,10 @@ private:
 		}
 		else {
 			createInfo.enabledLayerCount = 0;
-
+			createInfo.ppEnabledLayerNames = nullptr;
 			createInfo.pNext = nullptr;
 		}
+		
 		//-----------------------------------------------------
 		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create instance!");
